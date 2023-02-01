@@ -40,10 +40,6 @@ interface ERC1155P__IERC1155MetadataURI {
  * See https://eips.ethereum.org/EIPS/eip-1155
  */
 contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
-
-    // Mapping from account to operator approvals
-    mapping(address => mapping(address => bool)) private _operatorApprovals;
-
     // Optional mapping for token URIs
     mapping(uint256 => string) private _tokenURIs;
 
@@ -58,6 +54,10 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
     // `keccak256(bytes("TransferBatch(address,address,address,uint256[],uint256[])"))`.
     bytes32 private constant _TRANSFER_BATCH_EVENT_SIGNATURE =
         0x4a39dc06d4c0dbc64b70af90fd698a233a518aa5d07e595d983b8c0526c8f7fb;
+    // The `ApprovalForAll` event signature is given by:
+    // `keccak256(bytes("ApprovalForAll(address,address,bool)"))`.
+    bytes32 private constant _APPROVAL_FOR_ALL_EVENT_SIGNATURE =
+        0x17307eab39ab6107e8899845ad3d59bd9653f200f220920489ca2b5937696c31;
 
     /**
      * @dev See {_setURI}.
@@ -179,8 +179,15 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
     /**
      * @dev See {IERC1155-isApprovedForAll}.
      */
-    function isApprovedForAll(address account, address operator) public view virtual override returns (bool) {
-        return _operatorApprovals[account][operator];
+    function isApprovedForAll(address account, address operator) public view virtual override returns (bool _approved) {
+        assembly {
+            let ptr := mload(0x40)
+            mstore(ptr, account)
+            mstore(add(ptr, 0x20), operator)
+            let slot := keccak256(ptr, 0x40)
+            _approved := sload(slot)
+        }
+        return _approved; 
     }
 
     /**
@@ -589,8 +596,21 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      * Emits an {ApprovalForAll} event.
      */
     function setApprovalForAll(address operator, bool approved) public virtual override {
-        _operatorApprovals[_msgSenderERC1155P()][operator] = approved;
-        emit ApprovalForAll(_msgSenderERC1155P(), operator, approved);
+        assembly {
+            let ptr := mload(0x40)
+            mstore(ptr, caller())
+            mstore(add(ptr, 0x20), operator)
+            let slot := keccak256(ptr, 0x40)
+            sstore(slot, approved)
+            mstore(ptr, approved)
+            log3(
+                ptr,
+                0x20,
+                _APPROVAL_FOR_ALL_EVENT_SIGNATURE,
+                caller(),
+                operator
+            )
+        }
     }
 
     /**
