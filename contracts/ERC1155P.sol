@@ -130,8 +130,9 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      */
     function getBalance(address account, uint256 id) public view returns (uint256 _balance) {
         assembly {
-            mstore(0x100, or(shl(96, account), shr(4, id)))
-            _balance := shr(shl(4, and(id, 0x0F)), and(sload(mload(0x100)), shl(shl(4, and(id, 0x0F)), 0xFFFF)))
+            let ptr := mload(0x40)
+            mstore(ptr, or(shl(96, account), shr(4, id)))
+            _balance := shr(shl(4, and(id, 0x0F)), and(sload(mload(ptr)), shl(shl(4, and(id, 0x0F)), 0xFFFF)))
         }
         return _balance;
     }
@@ -142,10 +143,11 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      */
     function setBalance(address account, uint256 id, uint256 amount) public {
         assembly {
-            mstore(0x100, or(shl(96, account), shr(4, id)))
-            mstore(0x120, sload(mload(0x100)))
-            mstore(0x120, or(and(not(shl(shl(4, and(id, 0x0F)), 0xFFFF)), mload(0x120)), shl(shl(4, and(id, 0x0F)), amount)))
-            sstore(mload(0x100), mload(0x120))
+            let ptr := mload(0x40)
+            mstore(ptr, or(shl(96, account), shr(4, id)))
+            mstore(add(ptr, 0x20), sload(mload(ptr)))
+            mstore(add(ptr, 0x20), or(and(not(shl(shl(4, and(id, 0x0F)), 0xFFFF)), mload(add(ptr, 0x20))), shl(shl(4, and(id, 0x0F)), amount)))
+            sstore(mload(ptr), mload(add(ptr, 0x20)))
         }
     }
 
@@ -157,8 +159,8 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      * - `accounts` and `ids` must have the same length.
      */
     function balanceOfBatch(
-        address[] memory accounts,
-        uint256[] memory ids
+        address[] calldata accounts,
+        uint256[] calldata ids
     ) public view virtual override returns (uint256[] memory) {
         if(accounts.length != ids.length) { _revert(ArrayLengthMismatch.selector); }
 
@@ -695,8 +697,8 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
     function _checkContractOnERC1155BatchReceived(
         address from,
         address to,
-        uint256[] memory ids,
-        uint256[] memory amounts,
+        uint256[] calldata ids,
+        uint256[] calldata amounts,
         bytes memory _data
     ) private returns (bool) {
         try ERC1155P__IERC1155Receiver(to).onERC1155BatchReceived(_msgSenderERC1155P(), from, ids, amounts, _data) returns (
