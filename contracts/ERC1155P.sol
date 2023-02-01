@@ -41,9 +41,6 @@ interface ERC1155P__IERC1155MetadataURI {
  */
 contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
 
-    // Mapping from token ID to account balances
-    mapping(address => mapping(uint256 => uint256)) private _balances;
-
     // Mapping from account to operator approvals
     mapping(address => mapping(address => bool)) private _operatorApprovals;
 
@@ -51,8 +48,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
     mapping(uint256 => string) private _tokenURIs;
 
     uint256 private constant TOKEN_MASK = 0xFFFF;
-    uint256 private constant BUCKET_SHIFT = 4;
-    uint256 private constant ITEM_SHIFT = 16;
+    uint256 private constant MAX_TOKEN_ID = 0xFFFFFFFFFFFFFFFFFFFFFFFFF;
 
     // The `TransferSingle` event signature is given by:
     // `keccak256(bytes("TransferSingle(address,address,address,uint256,uint256)"))`.
@@ -132,10 +128,12 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      * @dev Gets the balance of an account's token id from packed token data
      *
      */
-    function getBalance(address account, uint256 id) public view returns (uint256) {
-        uint256 bucket = id >> BUCKET_SHIFT;
-        uint256 mask = TOKEN_MASK << ((id & 0x0F) * ITEM_SHIFT);
-        return ((_balances[account][bucket] & mask) >> ((id & 0x0F) * ITEM_SHIFT));
+    function getBalance(address account, uint256 id) public view returns (uint256 _balance) {
+        assembly {
+            mstore(0x100, or(shl(96, account), shr(4, id)))
+            _balance := shr(shl(4, and(id, 0x0F)), and(sload(mload(0x100)), shl(shl(4, and(id, 0x0F)), 0xFFFF)))
+        }
+        return _balance;
     }
 
     /**
@@ -143,13 +141,12 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      *
      */
     function setBalance(address account, uint256 id, uint256 amount) public {
-        uint256 bucket = id >> BUCKET_SHIFT;
-        uint256 mask = ~(TOKEN_MASK << ((id & 0x0F) * ITEM_SHIFT));
-        uint256 bucketBalance = _balances[account][bucket];
-        amount = amount << ((id & 0x0F) * ITEM_SHIFT);
-        bucketBalance &= mask;
-        bucketBalance |= amount;
-        _balances[account][bucket] = bucketBalance;
+        assembly {
+            mstore(0x100, or(shl(96, account), shr(4, id)))
+            mstore(0x120, sload(mload(0x100)))
+            mstore(0x120, or(and(not(shl(shl(4, and(id, 0x0F)), 0xFFFF)), mload(0x120)), shl(shl(4, and(id, 0x0F)), amount)))
+            sstore(mload(0x100), mload(0x120))
+        }
     }
 
     /**
@@ -192,7 +189,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
         address to,
         uint256 id,
         uint256 amount,
-        bytes calldata data
+        bytes memory data
     ) public virtual override {
         _safeTransferFrom(from, to, id, amount, data);
     }
@@ -205,7 +202,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
         address to,
         uint256[] calldata ids,
         uint256[] calldata amounts,
-        bytes calldata data
+        bytes memory data
     ) public virtual override {
         _safeBatchTransferFrom(from, to, ids, amounts, data);
     }
@@ -227,8 +224,9 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
         address to,
         uint256 id,
         uint256 amount,
-        bytes calldata data
+        bytes memory data
     ) internal virtual {
+        if(id > MAX_TOKEN_ID) { _revert(ExceedsMaximumTokenId.selector); }
         if(to == address(0)) { _revert(TransferToZeroAddress.selector); }
         
         if(from != _msgSenderERC1155P())
@@ -257,8 +255,8 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             mstore(memOffset, id)
             mstore(add(memOffset, 0x20), amount)
             log4(
-                memOffset, // Start of data (0, since no data).
-                0x40, // End of data (0, since no data).
+                memOffset, // Start of data .
+                0x40, // Length of data.
                 _TRANSFER_SINGLE_EVENT_SIGNATURE, // Signature.
                 operator, // `operator`.
                 from, // `from`.
@@ -289,7 +287,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
         address to,
         uint256[] calldata ids,
         uint256[] calldata amounts,
-        bytes calldata data
+        bytes memory data
     ) internal virtual {
         if(to == address(0)) { _revert(TransferToZeroAddress.selector); }
         if(ids.length != amounts.length) { _revert(ArrayLengthMismatch.selector); }
@@ -304,6 +302,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
         for (uint256 i = 0; i < ids.length;) {
             uint256 id = ids[i];
             uint256 amount = amounts[i];
+            if(id > MAX_TOKEN_ID) { _revert(ExceedsMaximumTokenId.selector); }
 
             uint256 fromBalance = getBalance(from, id);
             if(amount > fromBalance) { _revert(TransferExceedsBalance.selector); }
@@ -362,6 +361,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      * acceptance magic value.
      */
     function _mint(address to, uint256 id, uint256 amount, bytes memory data) internal virtual {
+        if(id > MAX_TOKEN_ID) { _revert(ExceedsMaximumTokenId.selector); }
         if(to == address(0)) { _revert(MintToZeroAddress.selector); }
         if(amount == 0) { _revert(MintZeroQuantity.selector); }
 
@@ -384,8 +384,8 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             mstore(memOffset, id)
             mstore(add(memOffset, 0x20), amount)
             log4(
-                memOffset, // Start of data (0, since no data).
-                0x40, // End of data (0, since no data).
+                memOffset, // Start of data .
+                0x40, // Length of data.
                 _TRANSFER_SINGLE_EVENT_SIGNATURE, // Signature.
                 operator, // `operator`.
                 0, // `from`.
@@ -416,7 +416,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
         address to,
         uint256[] calldata ids,
         uint256[] calldata amounts,
-        bytes calldata data
+        bytes memory data
     ) internal virtual {
         if(to == address(0)) { _revert(MintToZeroAddress.selector); }
         if(ids.length != amounts.length) { _revert(ArrayLengthMismatch.selector); }
@@ -430,6 +430,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
         for (uint256 i = 0; i < ids.length;) {
             id = ids[i];
             amount = amounts[i];
+            if(id > MAX_TOKEN_ID) { _revert(ExceedsMaximumTokenId.selector); }
             if(amount == 0) { _revert(MintZeroQuantity.selector); }
 
             uint256 toBalance = getBalance(to, id);
@@ -483,6 +484,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      * - `from` must have at least `amount` tokens of token type `id`.
      */
     function _burn(address from, uint256 id, uint256 amount) internal virtual {
+        if(id > MAX_TOKEN_ID) { _revert(ExceedsMaximumTokenId.selector); }
         if(from == address(0)) { _revert(BurnFromZeroAddress.selector); }
 
         address operator = _msgSenderERC1155P();
@@ -504,8 +506,8 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             mstore(memOffset, id)
             mstore(add(memOffset, 0x20), amount)
             log4(
-                memOffset, // Start of data (0, since no data).
-                0x40, // End of data (0, since no data).
+                memOffset, // Start of data.
+                0x40, // Length of data.
                 _TRANSFER_SINGLE_EVENT_SIGNATURE, // Signature.
                 operator, // `operator`.
                 from, // `from`.
@@ -536,6 +538,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
         for (uint256 i = 0; i < ids.length;) {
             uint256 id = ids[i];
             uint256 amount = amounts[i];
+            if(id > MAX_TOKEN_ID) { _revert(ExceedsMaximumTokenId.selector); }
 
             uint256 fromBalance = getBalance(from, id);
             if(amount > fromBalance) { _revert(BurnExceedsBalance.selector); }

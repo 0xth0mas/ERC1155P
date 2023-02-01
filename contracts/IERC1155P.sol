@@ -71,6 +71,11 @@ interface IERC1155P {
      * The token does not exist.
      */
     error URIQueryForNonexistentToken();
+
+    /**
+     * Exceeds max token ID
+     */
+    error ExceedsMaximumTokenId();
     
     // =============================================================
     //                            IERC165
