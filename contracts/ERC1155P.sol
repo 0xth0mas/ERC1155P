@@ -242,10 +242,8 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             if (!isApprovedForAll(from, _msgSenderERC1155P())) _revert(TransferCallerNotOwnerNorApproved.selector);
 
         address operator = _msgSenderERC1155P();
-        uint256[] memory ids = _asSingletonArray(id);
-        uint256[] memory amounts = _asSingletonArray(amount);
 
-        _beforeTokenTransfer(operator, from, to, ids, amounts, data);
+        _beforeTokenTransfer(operator, from, to, id, amount, data);
 
         uint256 fromBalance = getBalance(from, id);
         if(amount > fromBalance) { _revert(TransferExceedsBalance.selector); }
@@ -273,7 +271,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             )
         }
 
-        _afterTokenTransfer(operator, from, to, ids, amounts, data);
+        _afterTokenTransfer(operator, from, to, id, amount, data);
 
         if(to.code.length != 0)
             if(!_checkContractOnERC1155Received(from, to, id, amount, data))  {
@@ -306,7 +304,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
 
         address operator = _msgSenderERC1155P();
 
-        _beforeTokenTransfer(operator, from, to, ids, amounts, data);
+        _beforeBatchTokenTransfer(operator, from, to, ids, amounts, data);
 
         for (uint256 i = 0; i < ids.length;) {
             uint256 id = ids[i];
@@ -349,7 +347,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             )
         }
 
-        _afterTokenTransfer(operator, from, to, ids, amounts, data);
+        _afterBatchTokenTransfer(operator, from, to, ids, amounts, data);
 
 
         if(to.code.length != 0)
@@ -375,10 +373,8 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
         if(amount == 0) { _revert(MintZeroQuantity.selector); }
 
         address operator = _msgSenderERC1155P();
-        uint256[] memory ids = _asSingletonArray(id);
-        uint256[] memory amounts = _asSingletonArray(amount);
 
-        _beforeTokenTransfer(operator, address(0), to, ids, amounts, data);
+        _beforeTokenTransfer(operator, address(0), to, id, amount, data);
 
         uint256 toBalance = getBalance(to, id);
         unchecked {
@@ -402,7 +398,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             )
         }
 
-        _afterTokenTransfer(operator, address(0), to, ids, amounts, data);
+        _afterTokenTransfer(operator, address(0), to, id, amount, data);
 
         if(to.code.length != 0)
             if(!_checkContractOnERC1155Received(address(0), to, id, amount, data))  {
@@ -432,7 +428,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
 
         address operator = _msgSenderERC1155P();
 
-        _beforeTokenTransfer(operator, address(0), to, ids, amounts, data);
+        _beforeBatchTokenTransfer(operator, address(0), to, ids, amounts, data);
 
         uint256 id;
         uint256 amount;
@@ -447,7 +443,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
                 toBalance += amount;
             }
             if(toBalance > TOKEN_MASK) { _revert(ExceedsMaximumBalance.selector); }
-            setBalance(to, id, amount);
+            setBalance(to, id, toBalance);
             unchecked {
                 ++i;
             }
@@ -474,7 +470,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             )
         }
 
-        _afterTokenTransfer(operator, address(0), to, ids, amounts, data);
+        _afterBatchTokenTransfer(operator, address(0), to, ids, amounts, data);
 
         if(to.code.length != 0)
             if(!_checkContractOnERC1155BatchReceived(address(0), to, ids, amounts, data))  {
@@ -497,10 +493,8 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
         if(from == address(0)) { _revert(BurnFromZeroAddress.selector); }
 
         address operator = _msgSenderERC1155P();
-        uint256[] memory ids = _asSingletonArray(id);
-        uint256[] memory amounts = _asSingletonArray(amount);
 
-        _beforeTokenTransfer(operator, from, address(0), ids, amounts, "");
+        _beforeTokenTransfer(operator, from, address(0), id, amount, "");
 
         uint256 fromBalance = getBalance(from, id);
         if(amount > fromBalance) { _revert(BurnExceedsBalance.selector); }
@@ -524,7 +518,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             )
         }
 
-        _afterTokenTransfer(operator, from, address(0), ids, amounts, "");
+        _afterTokenTransfer(operator, from, address(0), id, amount, "");
     }
 
     /**
@@ -542,7 +536,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
 
         address operator = _msgSenderERC1155P();
 
-        _beforeTokenTransfer(operator, from, address(0), ids, amounts, "");
+        _beforeBatchTokenTransfer(operator, from, address(0), ids, amounts, "");
 
         for (uint256 i = 0; i < ids.length;) {
             uint256 id = ids[i];
@@ -581,7 +575,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             )
         }
 
-        _afterTokenTransfer(operator, from, address(0), ids, amounts, "");
+        _afterBatchTokenTransfer(operator, from, address(0), ids, amounts, "");
     }
 
     /**
@@ -637,8 +631,17 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
         address operator,
         address from,
         address to,
-        uint256[] memory ids,
-        uint256[] memory amounts,
+        uint256 id,
+        uint256 amount,
+        bytes memory data
+    ) internal virtual {}
+    
+    function _beforeBatchTokenTransfer(
+        address operator,
+        address from,
+        address to,
+        uint256[] calldata ids,
+        uint256[] calldata amounts,
         bytes memory data
     ) internal virtual {}
 
@@ -666,8 +669,17 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
         address operator,
         address from,
         address to,
-        uint256[] memory ids,
-        uint256[] memory amounts,
+        uint256 id,
+        uint256 amount,
+        bytes memory data
+    ) internal virtual {}
+    
+    function _afterBatchTokenTransfer(
+        address operator,
+        address from,
+        address to,
+        uint256[] calldata ids,
+        uint256[] calldata amounts,
         bytes memory data
     ) internal virtual {}
 
