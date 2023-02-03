@@ -68,11 +68,6 @@ interface IERC1155P {
     error TransferToZeroAddress();
 
     /**
-     * The token does not exist.
-     */
-    error URIQueryForNonexistentToken();
-
-    /**
      * Exceeds max token ID
      */
     error ExceedsMaximumTokenId();

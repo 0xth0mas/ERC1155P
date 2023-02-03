@@ -13,6 +13,20 @@ import "../ERC1155P.sol";
  * same id are not going to be minted.
  */
 abstract contract ERC1155PSupply is ERC1155P {
+    /**
+     * @dev Custom storage pointer for total token supply. Total supply is 
+     *      split into buckets of 8 tokens per bucket allowing for 32 bits 
+     *      per token for a max value of 0xFFFFFFFF (~4.3B) of a single token. 
+     *      The standard ERC1155P implementation allows a maximum token id
+     *      of 0xFFFFFFFFFFFFFFFFFFFFFFFFF which requires a max bucket count of
+     *      1FFFFFFFFFFFFFFFFFFFFFFFF. Storage slots for buckets start at
+     *      0xF000000000000000000000000000000000000000000000000000000000000000
+     *      and continue through
+     *      0xF000000000000000000000000000000000000001FFFFFFFFFFFFFFFFFFFFFFFF
+     *      There are two addresses 0xF00...000 and 0xF00...001 that could create
+     *      storage collisions with wallet balance data however the probability of
+     *      that collision is extremely small ~1/2^159.
+     */
     uint256 private constant TOTAL_SUPPLY_STORAGE_OFFSET = 0xF000000000000000000000000000000000000000000000000000000000000000;
     uint256 private constant MAX_TOTAL_SUPPLY = 0xFFFFFFFF;
 

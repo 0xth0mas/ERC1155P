@@ -25,6 +25,10 @@ interface ERC1155P__IERC1155Receiver {
     ) external returns (bytes4);
 }
 
+/**
+ * @dev Interface for IERC1155MetadataURI.
+ */
+
 interface ERC1155P__IERC1155MetadataURI {
     /**
      * @dev Returns the URI for token type `id`.
@@ -40,10 +44,19 @@ interface ERC1155P__IERC1155MetadataURI {
  * See https://eips.ethereum.org/EIPS/eip-1155
  */
 contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
-    // Optional mapping for token URIs
-    mapping(uint256 => string) private _tokenURIs;
 
-    uint256 private constant TOKEN_MASK = 0xFFFF;
+    /**
+     * @dev MAX_ACCOUNT_TOKEN_BALANCE is 2^16-1 because token balances are
+     *      are being packed into 16 bits within each bucket.
+     */
+    uint256 private constant MAX_ACCOUNT_TOKEN_BALANCE = 0xFFFF;
+
+    /**
+     * @dev MAX_TOKEN_ID is derived from custom storage pointer location for 
+     *      account/token balance data. Wallet address is shifted 96 bits left
+     *      and leaves 96 bits for bucket #'s. Each bucket holds 16 token balances
+     *      2^96*16-1 = MAX_TOKEN_ID
+     */
     uint256 private constant MAX_TOKEN_ID = 0xFFFFFFFFFFFFFFFFFFFFFFFFF;
 
     // The `TransferSingle` event signature is given by:
@@ -59,10 +72,21 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
     bytes32 private constant _APPROVAL_FOR_ALL_EVENT_SIGNATURE =
         0x17307eab39ab6107e8899845ad3d59bd9653f200f220920489ca2b5937696c31;
 
+    string public name; //collection name
+    string public symbol; //collection symbol
+
+    // Optional mapping for token URIs
+    mapping(uint256 => string) private _tokenURIs;
+
     /**
-     * @dev See {_setURI}.
+     * @dev constructor initialization of name and symbol parameters
+     * @param _name the name to display for the collection
+     * @param _symbol the symbol for the token collection
      */
-    constructor() { }
+    constructor(string memory _name, string memory _symbol) {
+        name = _name;
+        symbol = _symbol;
+    }
 
     /**
      * @dev Returns true if this contract implements the interface defined by
@@ -107,7 +131,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
     /**
      * @dev Sets `tokenURI` as the tokenURI of `tokenId`.
      */
-    function _setURI(uint256 tokenId, string memory tokenURI) internal virtual {
+    function _setURI(uint256 tokenId, string calldata tokenURI) internal virtual {
         _tokenURIs[tokenId] = tokenURI;
         emit URI(uri(tokenId), tokenId);
     }
@@ -128,7 +152,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      * @dev Gets the balance of an account's token id from packed token data
      *
      */
-    function getBalance(address account, uint256 id) public view returns (uint256 _balance) {
+    function getBalance(address account, uint256 id) private view returns (uint256 _balance) {
         assembly {
             let ptr := mload(0x40)
             mstore(ptr, or(shl(96, account), shr(4, id)))
@@ -141,7 +165,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      * @dev Sets the balance of an account's token id in packed token data
      *
      */
-    function setBalance(address account, uint256 id, uint256 amount) public {
+    function setBalance(address account, uint256 id, uint256 amount) private {
         assembly {
             let ptr := mload(0x40)
             mstore(ptr, or(shl(96, account), shr(4, id)))
@@ -252,7 +276,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             fromBalance -= amount;
             toBalance += amount;
         }
-        if(toBalance > TOKEN_MASK) { _revert(ExceedsMaximumBalance.selector); }
+        if(toBalance > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
         setBalance(from, id, fromBalance);
         setBalance(to, id, toBalance);
 
@@ -318,7 +342,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
                 fromBalance -= amount;
                 toBalance += amount;
             }
-            if(toBalance > TOKEN_MASK) { _revert(ExceedsMaximumBalance.selector); }
+            if(toBalance > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
             setBalance(from, id, fromBalance);
             setBalance(to, id, toBalance);
             unchecked {
@@ -380,7 +404,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
         unchecked {
             toBalance += amount;
         }
-        if(toBalance > TOKEN_MASK) { _revert(ExceedsMaximumBalance.selector); }
+        if(toBalance > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
         setBalance(to, id, toBalance);
 
         assembly {
@@ -442,7 +466,7 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             unchecked {
                 toBalance += amount;
             }
-            if(toBalance > TOKEN_MASK) { _revert(ExceedsMaximumBalance.selector); }
+            if(toBalance > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
             setBalance(to, id, toBalance);
             unchecked {
                 ++i;
@@ -583,10 +607,6 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      * Operators can call {transferFrom} or {safeTransferFrom}
      * for any token owned by the caller.
      *
-     * Requirements:
-     *
-     * - The `operator` cannot be the caller.
-     *
      * Emits an {ApprovalForAll} event.
      */
     function setApprovalForAll(address operator, bool approved) public virtual override {
@@ -608,13 +628,10 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
     }
 
     /**
-     * @dev Hook that is called before any token transfer. This includes minting
-     * and burning, as well as batched variants.
+     * @dev Hook that is called before any single token transfer. This includes minting
+     * and burning.
      *
-     * The same hook is called on both single and batched variants. For single
-     * transfers, the length of the `ids` and `amounts` arrays will be 1.
-     *
-     * Calling conditions (for each `id` and `amount` pair):
+     * Calling conditions:
      *
      * - When `from` and `to` are both non-zero, `amount` of ``from``'s tokens
      * of token type `id` will be  transferred to `to`.
@@ -623,7 +640,6 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      * - when `to` is zero, `amount` of ``from``'s tokens of token type `id`
      * will be burned.
      * - `from` and `to` are never both zero.
-     * - `ids` and `amounts` have the same, non-zero length.
      *
      * To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks].
      */
@@ -635,22 +651,12 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
         uint256 amount,
         bytes memory data
     ) internal virtual {}
+
     
-    function _beforeBatchTokenTransfer(
-        address operator,
-        address from,
-        address to,
-        uint256[] calldata ids,
-        uint256[] calldata amounts,
-        bytes memory data
-    ) internal virtual {}
 
     /**
-     * @dev Hook that is called after any token transfer. This includes minting
-     * and burning, as well as batched variants.
-     *
-     * The same hook is called on both single and batched variants. For single
-     * transfers, the length of the `id` and `amount` arrays will be 1.
+     * @dev Hook that is called before any batch token transfer. This includes minting
+     * and burning.
      *
      * Calling conditions (for each `id` and `amount` pair):
      *
@@ -665,6 +671,32 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      *
      * To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks].
      */
+    
+    function _beforeBatchTokenTransfer(
+        address operator,
+        address from,
+        address to,
+        uint256[] calldata ids,
+        uint256[] calldata amounts,
+        bytes memory data
+    ) internal virtual {}
+
+    /**
+     * @dev Hook that is called after any single token transfer. This includes minting
+     * and burning.
+     *
+     * Calling conditions:
+     *
+     * - When `from` and `to` are both non-zero, `amount` of ``from``'s tokens
+     * of token type `id` will be  transferred to `to`.
+     * - When `from` is zero, `amount` tokens of token type `id` will be minted
+     * for `to`.
+     * - when `to` is zero, `amount` of ``from``'s tokens of token type `id`
+     * will be burned.
+     * - `from` and `to` are never both zero.
+     *
+     * To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks].
+     */
     function _afterTokenTransfer(
         address operator,
         address from,
@@ -673,6 +705,24 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
         uint256 amount,
         bytes memory data
     ) internal virtual {}
+
+    /**
+     * @dev Hook that is called after any batch token transfer. This includes minting
+     * and burning.
+     *
+     * Calling conditions (for each `id` and `amount` pair):
+     *
+     * - When `from` and `to` are both non-zero, `amount` of ``from``'s tokens
+     * of token type `id` will be  transferred to `to`.
+     * - When `from` is zero, `amount` tokens of token type `id` will be minted
+     * for `to`.
+     * - when `to` is zero, `amount` of ``from``'s tokens of token type `id`
+     * will be burned.
+     * - `from` and `to` are never both zero.
+     * - `ids` and `amounts` have the same, non-zero length.
+     *
+     * To learn more about hooks, head to xref:ROOT:extending-contracts.adoc#using-hooks[Using Hooks].
+     */
     
     function _afterBatchTokenTransfer(
         address operator,
@@ -746,14 +796,6 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             }
         }
     }
-
-    function _asSingletonArray(uint256 element) private pure returns (uint256[] memory) {
-        uint256[] memory array = new uint256[](1);
-        array[0] = element;
-
-        return array;
-    }
-
     
     /**
      * @dev Returns the message sender (defaults to `msg.sender`).
