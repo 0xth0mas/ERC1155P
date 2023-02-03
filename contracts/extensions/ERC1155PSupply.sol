@@ -50,7 +50,7 @@ abstract contract ERC1155PSupply is ERC1155P {
     /**
      * @dev Sets total supply in custom storage slot location
      */
-    function setTotalSupply(uint256 id, uint256 amount) public {
+    function setTotalSupply(uint256 id, uint256 amount) private {
         assembly {
             let ptr := mload(0x40)
             mstore(ptr, or(TOTAL_SUPPLY_STORAGE_OFFSET, shr(3, id)))
