@@ -352,18 +352,15 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
 
         assembly {
             let memOffset := mload(0x40)
-            mstore(0x40, add(memOffset, add(0x80,mul(0x20,add(amounts.length,ids.length)))))
-            mstore(add(memOffset,0x00), 0x40)
-            mstore(add(memOffset,0x20), mul(0x20,add(amounts.length,ids.length)))
-            let memIds := add(memOffset,0x40)
-            mstore(add(memIds, 0x00), amounts.length)
-            calldatacopy(add(memIds, 0x20), amounts.offset, mul(0x20,amounts.length))
-            let memValues := add(memIds,mul(0x20,add(1,amounts.length)))
-            mstore(memValues, ids.length)
-            calldatacopy(add(memValues, 0x20), ids.offset, mul(0x20,ids.length))
+            mstore(memOffset, 0x40)
+            mstore(add(memOffset,0x20), add(0x60, mul(0x20,ids.length)))
+            mstore(add(memOffset,0x40), ids.length)
+            calldatacopy(add(memOffset,0x60), ids.offset, mul(0x20,ids.length))
+            mstore(add(add(memOffset,0x60),mul(0x20,ids.length)), amounts.length)
+            calldatacopy(add(add(memOffset,0x80),mul(0x20,ids.length)), amounts.offset, mul(0x20,amounts.length))
             log4(
                 memOffset, 
-                add(0x80,mul(0x20,add(amounts.length,ids.length))),
+                add(0x80,mul(0x40,amounts.length)),
                 _TRANSFER_BATCH_EVENT_SIGNATURE, // Signature.
                 operator, // `operator`.
                 from, // `from`.
@@ -475,18 +472,15 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
 
         assembly {
             let memOffset := mload(0x40)
-            mstore(0x40, add(memOffset, add(0x80,mul(0x20,add(amounts.length,ids.length)))))
-            mstore(add(memOffset,0x00), 0x40)
-            mstore(add(memOffset,0x20), mul(0x20,add(amounts.length,ids.length)))
-            let memIds := add(memOffset,0x40)
-            mstore(add(memIds, 0x00), amounts.length)
-            calldatacopy(add(memIds, 0x20), amounts.offset, mul(0x20,amounts.length))
-            let memValues := add(memIds,mul(0x20,add(1,amounts.length)))
-            mstore(memValues, ids.length)
-            calldatacopy(add(memValues, 0x20), ids.offset, mul(0x20,ids.length))
+            mstore(memOffset, 0x40)
+            mstore(add(memOffset,0x20), add(0x60, mul(0x20,ids.length)))
+            mstore(add(memOffset,0x40), ids.length)
+            calldatacopy(add(memOffset,0x60), ids.offset, mul(0x20,ids.length))
+            mstore(add(add(memOffset,0x60),mul(0x20,ids.length)), amounts.length)
+            calldatacopy(add(add(memOffset,0x80),mul(0x20,ids.length)), amounts.offset, mul(0x20,amounts.length))
             log4(
                 memOffset, 
-                add(0x80,mul(0x20,add(amounts.length,ids.length))),
+                add(0x80,mul(0x40,amounts.length)),
                 _TRANSFER_BATCH_EVENT_SIGNATURE, // Signature.
                 operator, // `operator`.
                 0, // `from`.
@@ -580,18 +574,15 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
 
         assembly {
             let memOffset := mload(0x40)
-            mstore(0x40, add(memOffset, add(0x80,mul(0x20,add(amounts.length,ids.length)))))
-            mstore(add(memOffset,0x00), 0x40)
-            mstore(add(memOffset,0x20), mul(0x20,add(amounts.length,ids.length)))
-            let memIds := add(memOffset,0x40)
-            mstore(add(memIds, 0x00), amounts.length)
-            calldatacopy(add(memIds, 0x20), amounts.offset, mul(0x20,amounts.length))
-            let memValues := add(memIds,mul(0x20,add(1,amounts.length)))
-            mstore(memValues, ids.length)
-            calldatacopy(add(memValues, 0x20), ids.offset, mul(0x20,ids.length))
+            mstore(memOffset, 0x40)
+            mstore(add(memOffset,0x20), add(0x60, mul(0x20,ids.length)))
+            mstore(add(memOffset,0x40), ids.length)
+            calldatacopy(add(memOffset,0x60), ids.offset, mul(0x20,ids.length))
+            mstore(add(add(memOffset,0x60),mul(0x20,ids.length)), amounts.length)
+            calldatacopy(add(add(memOffset,0x80),mul(0x20,ids.length)), amounts.offset, mul(0x20,amounts.length))
             log4(
                 memOffset, 
-                add(0x80,mul(0x20,add(amounts.length,ids.length))),
+                add(0x80,mul(0x40,amounts.length)),
                 _TRANSFER_BATCH_EVENT_SIGNATURE, // Signature.
                 operator, // `operator`.
                 from, // `from`.
