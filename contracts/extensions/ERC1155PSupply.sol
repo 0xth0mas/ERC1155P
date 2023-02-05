@@ -42,7 +42,7 @@ abstract contract ERC1155PSupply is ERC1155P {
         assembly {
             let ptr := mload(0x40)
             mstore(ptr, or(TOTAL_SUPPLY_STORAGE_OFFSET, shr(3, id)))
-            _totalSupply := shr(shl(3, and(id, 0x07)), and(sload(mload(ptr)), shl(shl(3, and(id, 0x07)), 0xFF)))
+            _totalSupply := shr(shl(5, and(id, 0x07)), and(sload(mload(ptr)), shl(shl(5, and(id, 0x07)), 0xFFFFFFFF)))
         }
         return _totalSupply;
     }
@@ -55,7 +55,7 @@ abstract contract ERC1155PSupply is ERC1155P {
             let ptr := mload(0x40)
             mstore(ptr, or(TOTAL_SUPPLY_STORAGE_OFFSET, shr(3, id)))
             mstore(add(ptr, 0x20), sload(mload(ptr)))
-            mstore(add(ptr, 0x20), or(and(not(shl(shl(3, and(id, 0x07)), 0xFF)), mload(add(ptr, 0x20))), shl(shl(3, and(id, 0x07)), amount)))
+            mstore(add(ptr, 0x20), or(and(not(shl(shl(5, and(id, 0x07)), 0xFFFFFFFF)), mload(add(ptr, 0x20))), shl(shl(5, and(id, 0x07)), amount)))
             sstore(mload(ptr), mload(add(ptr, 0x20)))
         }
     }
