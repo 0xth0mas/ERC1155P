@@ -269,16 +269,18 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
 
         _beforeTokenTransfer(operator, from, to, id, amount, data);
 
-        uint256 fromBalance = getBalance(from, id);
-        if(amount > fromBalance) { _revert(TransferExceedsBalance.selector); }
-        uint256 toBalance = getBalance(to, id);
-        unchecked {
-            fromBalance -= amount;
-            toBalance += amount;
+        if(from != to) {
+            uint256 fromBalance = getBalance(from, id);
+            if(amount > fromBalance) { _revert(TransferExceedsBalance.selector); }
+            uint256 toBalance = getBalance(to, id);
+            unchecked {
+                fromBalance -= amount;
+                toBalance += amount;
+            }
+            if(toBalance > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
+            setBalance(from, id, fromBalance);
+            setBalance(to, id, toBalance);   
         }
-        if(toBalance > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
-        setBalance(from, id, fromBalance);
-        setBalance(to, id, toBalance);
 
         assembly {
             // Emit the `TransferSingle` event.
@@ -330,23 +332,25 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
 
         _beforeBatchTokenTransfer(operator, from, to, ids, amounts, data);
 
-        for (uint256 i = 0; i < ids.length;) {
-            uint256 id = ids[i];
-            uint256 amount = amounts[i];
-            if(id > MAX_TOKEN_ID) { _revert(ExceedsMaximumTokenId.selector); }
+        if(from != to) {
+            for (uint256 i = 0; i < ids.length;) {
+                uint256 id = ids[i];
+                uint256 amount = amounts[i];
+                if(id > MAX_TOKEN_ID) { _revert(ExceedsMaximumTokenId.selector); }
 
-            uint256 fromBalance = getBalance(from, id);
-            if(amount > fromBalance) { _revert(TransferExceedsBalance.selector); }
-            uint256 toBalance = getBalance(to, id);
-            unchecked {
-                fromBalance -= amount;
-                toBalance += amount;
-            }
-            if(toBalance > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
-            setBalance(from, id, fromBalance);
-            setBalance(to, id, toBalance);
-            unchecked {
-                 ++i;
+                uint256 fromBalance = getBalance(from, id);
+                if(amount > fromBalance) { _revert(TransferExceedsBalance.selector); }
+                uint256 toBalance = getBalance(to, id);
+                unchecked {
+                    fromBalance -= amount;
+                    toBalance += amount;
+                }
+                if(toBalance > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
+                setBalance(from, id, fromBalance);
+                setBalance(to, id, toBalance);
+                unchecked {
+                    ++i;
+                }
             }
         }
 
