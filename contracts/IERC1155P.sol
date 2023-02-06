@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
+// ERC721P Contracts v1.0.0
 
-pragma solidity ^0.8.0;
+pragma solidity >=0.8.17;
 
 /**
  * @dev Required interface of an ERC1155 compliant contract, as defined in the

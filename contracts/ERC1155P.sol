@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
+// ERC721P Contracts v1.0.0
+// Creator: 0xjustadev/0xth0mas
+// Special thanks to those who provided early feedback and reviews:
+//  - 0xQuit, emo.eth, Layerr,
+//  - euphoric.eth, Gallwas, Rookmate
+//  - and wagglefoot
 
-pragma solidity ^0.8.0;
+pragma solidity >=0.8.17;
 
 import "./IERC1155P.sol";
 
@@ -39,9 +45,16 @@ interface ERC1155P__IERC1155MetadataURI {
     function uri(uint256 id) external view returns (string memory);
 }
 
-/**
+ /**
+ * @title ERC721P
+ *
  * @dev Implementation of the basic standard multi-token.
- * See https://eips.ethereum.org/EIPS/eip-1155
+ * See https://eips.ethereum.org/EIPS/eip-1155 including the Metadata extension.
+ * Optimized for lower gas for users collecting multiple tokens.
+ *
+ * Assumptions:
+ * - An owner cannot have more than 2**16 - 1 of a single token
+ * - The maximum token ID cannot exceed 2**100 - 1
  */
 contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
 
