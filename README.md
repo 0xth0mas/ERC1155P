@@ -13,18 +13,21 @@ ERC1155P includes an extension - ERC1155PSupply - that applies similar balance p
 #### OpenSea sale of 7 tokens from 3 different owners
 ERC1155P Gas Used: 597,364:
 https://goerli.etherscan.io/tx/0xb9867ef727010e004073803506cb5d36600f3c0183f62e37ea090eabd385c1c6
+
 ERC1155 Gas Used: 848,172
 https://etherscan.io/tx/0x67573b9dc0cfa08abd4e78fc13d248869e7424caa4837a3c418b2d57ad2f7e72 
 
 #### Batch transfer of 7 tokens through OpenSea transfer helper
 ERC1155P Gas Used: 127,335
 https://goerli.etherscan.io/tx/0xf49c3ad6c434ce0dcb357be0a87a1e81f3875592a771e6928ae73925fcb4cc00
+
 ERC1155 Gas Used: 318,556
 https://etherscan.io/tx/0xbb2d61a52d9dd5ae454a442baf3acd09d4206f81a0457deb601d95b906d0ecf3
 
 #### Burn 1 token to mint 1 token
 ERC1155P Gas Used: 62,574
 https://goerli.etherscan.io/tx/0xa9603d4cae42baa29a99921c6496e7e9179388a84ee1087f40458de39958aea2
+
 Manifold ERC1155 Gas Used: 149,157
 https://etherscan.io/tx/0xdc4ce233bc3ced649e8525c61cac00b553c5ebc75a1c7a62a34a38548ca8022a
 
