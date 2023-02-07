@@ -44,3 +44,13 @@ https://github.com/0xth0mas/ERC1155P/tree/main/tests
 **Maximum Total Supply:** ERC1155PSupply utilizes storage packing for the totalSupply of each token in a similar way to the account/token balances except it packs 8 tokens into one storage slot instead of 16 tokens. This allows for a maximum totalSupply of a single token to be 2^32-1, or approximately 4.3B.
 
 **Potential Storage Collision:** ERC1155PSupply uses custom storage pointers starting with 0xF0000... combined with a token totalSupply bucket id. With each bucket holding 8 token totalSupply balances and the maximum number of total token ids being 2^100 the number of buckets required is 2^97 creating a 1 bit overlap with potential account/token balances. If a user had either wallet address 0xF000000000000000000000000000000000000000 or 0xF000000000000000000000000000000000000001 their token balances would collide with totalSupply balances. With wallet addresses being 160 bits there is a 1 in 2^159 potential for collision, just half the odds of finding any other specific Ethereum address private key.
+
+
+## License
+
+Distributed under the MIT License. See `LICENSE.md` for more information.
+
+
+## Contact
+
+- 0xth0mas (owner) - [@0xjustadev](https://twitter.com/0xjustadev)
