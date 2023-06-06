@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: MIT
-// ERC721P Contracts v1.0.0
+// ERC721P Contracts v1.1
 // Creator: 0xjustadev/0xth0mas
-// Special thanks to those who provided early feedback and reviews:
-//  - 0xQuit, emo.eth, Layerr,
-//  - euphoric.eth, Gallwas, Rookmate
-//  - and wagglefoot
 
-pragma solidity >=0.8.17;
+pragma solidity ^0.8.19;
 
 import "./IERC1155P.sol";
 
@@ -56,7 +52,7 @@ interface ERC1155P__IERC1155MetadataURI {
  * - An owner cannot have more than 2**16 - 1 of a single token
  * - The maximum token ID cannot exceed 2**100 - 1
  */
-contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
+abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
 
     /**
      * @dev MAX_ACCOUNT_TOKEN_BALANCE is 2^16-1 because token balances are
@@ -64,13 +60,19 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      */
     uint256 private constant MAX_ACCOUNT_TOKEN_BALANCE = 0xFFFF;
 
+    uint256 private constant BALANCE_STORAGE_OFFSET =
+        0xE000000000000000000000000000000000000000000000000000000000000000;
+
+    uint256 private constant APPROVAL_STORAGE_OFFSET =
+        0xD000000000000000000000000000000000000000000000000000000000000000;
+
     /**
      * @dev MAX_TOKEN_ID is derived from custom storage pointer location for 
-     *      account/token balance data. Wallet address is shifted 96 bits left
-     *      and leaves 96 bits for bucket #'s. Each bucket holds 16 token balances
-     *      2^96*16-1 = MAX_TOKEN_ID
+     *      account/token balance data. Wallet address is shifted 92 bits left
+     *      and leaves 92 bits for bucket #'s. Each bucket holds 8 token balances
+     *      2^92*8-1 = MAX_TOKEN_ID
      */
-    uint256 private constant MAX_TOKEN_ID = 0xFFFFFFFFFFFFFFFFFFFFFFFFF;
+    uint256 private constant MAX_TOKEN_ID = 0x07FFFFFFFFFFFFFFFFFFFFFFF;
 
     // The `TransferSingle` event signature is given by:
     // `keccak256(bytes("TransferSingle(address,address,address,uint256,uint256)"))`.
@@ -162,16 +164,22 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
     }
 
     /**
+     * @dev Gets the amount of tokens minted by an account for a given token id
+     */
+    function _numberMinted(address account, uint256 id) internal view returns (uint256) {
+        if(account == address(0)) { _revert(BalanceQueryForZeroAddress.selector); }
+        return getMinted(account, id);
+    }
+
+    /**
      * @dev Gets the balance of an account's token id from packed token data
      *
      */
     function getBalance(address account, uint256 id) private view returns (uint256 _balance) {
         assembly {
-            let ptr := mload(0x40)
-            mstore(ptr, or(shl(96, account), shr(4, id)))
-            _balance := shr(shl(4, and(id, 0x0F)), and(sload(mload(ptr)), shl(shl(4, and(id, 0x0F)), 0xFFFF)))
+            mstore(0x00, or(BALANCE_STORAGE_OFFSET, or(shr(4, shl(96, account)), shr(3, id))))
+            _balance := shr(shl(5, and(id, 0x07)), and(sload(keccak256(0x00, 0x20)), shl(shl(5, and(id, 0x07)), 0x0000FFFF)))
         }
-        return _balance;
     }
 
     /**
@@ -180,11 +188,36 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      */
     function setBalance(address account, uint256 id, uint256 amount) private {
         assembly {
-            let ptr := mload(0x40)
-            mstore(ptr, or(shl(96, account), shr(4, id)))
-            mstore(add(ptr, 0x20), sload(mload(ptr)))
-            mstore(add(ptr, 0x20), or(and(not(shl(shl(4, and(id, 0x0F)), 0xFFFF)), mload(add(ptr, 0x20))), shl(shl(4, and(id, 0x0F)), amount)))
-            sstore(mload(ptr), mload(add(ptr, 0x20)))
+            mstore(0x00, or(BALANCE_STORAGE_OFFSET, or(shr(4, shl(96, account)), shr(3, id))))
+            mstore(0x00, keccak256(0x00, 0x20))
+            mstore(0x20, sload(mload(0x00)))
+            mstore(0x20, or(and(not(shl(shl(5, and(id, 0x07)), 0x0000FFFF)), mload(0x20)), shl(shl(5, and(id, 0x07)), amount)))
+            sstore(mload(0x00), mload(0x20))
+        }
+    }
+
+    /**
+     * @dev Gets the number minted of an account's token id from packed token data
+     *
+     */
+    function getMinted(address account, uint256 id) private view returns (uint256 _minted) {
+        assembly {
+            mstore(0x00, or(BALANCE_STORAGE_OFFSET, or(shr(4, shl(96, account)), shr(3, id))))
+            _minted := shr(16, shr(shl(5, and(id, 0x07)), and(sload(keccak256(0x00, 0x20)), shl(shl(5, and(id, 0x07)), 0xFFFF0000))))
+        }
+    }
+
+    /**
+     * @dev Sets the number minted of an account's token id in packed token data
+     *
+     */
+    function setMinted(address account, uint256 id, uint256 amount) private {
+        assembly {
+            mstore(0x00, or(BALANCE_STORAGE_OFFSET, or(shr(4, shl(96, account)), shr(3, id))))
+            mstore(0x00, keccak256(0x00, 0x20))
+            mstore(0x20, sload(mload(0x00)))
+            mstore(0x20, or(and(not(shl(shl(5, and(id, 0x07)), 0xFFFF0000)), mload(0x20)), shl(shl(5, and(id, 0x07)), shl(16, amount))))
+            sstore(mload(0x00), mload(0x20))
         }
     }
 
@@ -218,11 +251,11 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      */
     function isApprovedForAll(address account, address operator) public view virtual override returns (bool _approved) {
         assembly {
-            let ptr := mload(0x40)
-            mstore(ptr, account)
-            mstore(add(ptr, 0x20), operator)
-            let slot := keccak256(ptr, 0x40)
-            _approved := sload(slot)
+            mstore(0x00, shr(96, shl(96, account)))
+            mstore(0x20, or(APPROVAL_STORAGE_OFFSET, shr(96, shl(96, operator))))
+            mstore(0x00, keccak256(0x00, 0x40))
+            mstore(0x00, keccak256(0x00, 0x20))
+            _approved := sload(mload(0x00))
         }
         return _approved; 
     }
@@ -415,11 +448,14 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
         _beforeTokenTransfer(operator, address(0), to, id, amount, data);
 
         uint256 toBalance = getBalance(to, id);
+        uint256 toMinted = getMinted(to, id);
         unchecked {
             toBalance += amount;
+            toMinted += amount;
         }
-        if(toBalance > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
+        if(toBalance > MAX_ACCOUNT_TOKEN_BALANCE || toMinted > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
         setBalance(to, id, toBalance);
+        setMinted(to, id, toMinted);
 
         assembly {
             // Emit the `TransferSingle` event.
@@ -477,11 +513,14 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             if(amount == 0) { _revert(MintZeroQuantity.selector); }
 
             uint256 toBalance = getBalance(to, id);
+            uint256 toMinted = getMinted(to, id);
             unchecked {
                 toBalance += amount;
+                toMinted += amount;
             }
-            if(toBalance > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
+            if(toBalance > MAX_ACCOUNT_TOKEN_BALANCE || toMinted > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
             setBalance(to, id, toBalance);
+            setMinted(to, id, toMinted);
             unchecked {
                 ++i;
             }
@@ -619,18 +658,18 @@ contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      */
     function setApprovalForAll(address operator, bool approved) public virtual override {
         assembly {
-            let ptr := mload(0x40)
-            mstore(ptr, caller())
-            mstore(add(ptr, 0x20), operator)
-            let slot := keccak256(ptr, 0x40)
-            sstore(slot, approved)
-            mstore(ptr, approved)
+            mstore(0x00, caller())
+            mstore(0x20, or(APPROVAL_STORAGE_OFFSET, shr(96, shl(96, operator))))
+            mstore(0x00, keccak256(0x00, 0x40))
+            mstore(0x00, keccak256(0x00, 0x20))
+            mstore(0x20, approved)
+            sstore(mload(0x00), mload(0x20))
             log3(
-                ptr,
+                0x20,
                 0x20,
                 _APPROVAL_FOR_ALL_EVENT_SIGNATURE,
                 caller(),
-                operator
+                shr(96, shl(96, operator))
             )
         }
     }

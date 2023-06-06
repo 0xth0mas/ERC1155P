@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.19;
 
 import "../ERC1155P.sol";
 
@@ -14,20 +14,30 @@ import "../ERC1155P.sol";
  */
 abstract contract ERC1155PSupply is ERC1155P {
     /**
-     * @dev Custom storage pointer for total token supply. Total supply is 
-     *      split into buckets of 8 tokens per bucket allowing for 32 bits 
-     *      per token for a max value of 0xFFFFFFFF (~4.3B) of a single token. 
+     * @dev Custom storage pointer for total token supply. Total supply is
+     *      split into buckets of 4 tokens per bucket allowing for 64 bits
+     *      per token. 
+     *      32 bits are used to store total supply for a max value of 0xFFFFFFFF 
+     *      (~4.3B) of a single token. 
+     *      32 bits are used to store the mint count for a token
+     * 
      *      The standard ERC1155P implementation allows a maximum token id
-     *      of 0xFFFFFFFFFFFFFFFFFFFFFFFFF which requires a max bucket count of
-     *      1FFFFFFFFFFFFFFFFFFFFFFFF. Storage slots for buckets start at
+     *      of 0x0FFFFFFFFFFFFFFFFFFFFFFFF which requires a max bucket id of
+     *      0x1FFFFFFFFFFFFFFFFFFFFFFF. Storage slots for buckets start at
      *      0xF000000000000000000000000000000000000000000000000000000000000000
      *      and continue through
-     *      0xF000000000000000000000000000000000000001FFFFFFFFFFFFFFFFFFFFFFFF
-     *      There are two addresses 0xF00...000 and 0xF00...001 that could create
-     *      storage collisions with wallet balance data however the probability of
-     *      that collision is extremely small ~1/2^159.
+     *      0xF0000000000000000000000000000000000000001FFFFFFFFFFFFFFFFFFFFFFF
+     * 
+     *      Storage pointers for ERC1155P account balances start at
+     *      0xE000000000000000000000000000000000000000000000000000000000000000
+     *      and continue through
+     *      0xEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+     * 
+     *      All custom pointers get hashed to avoid potential conflicts or 
+     *      incorrect returns on view functions.
      */
-    uint256 private constant TOTAL_SUPPLY_STORAGE_OFFSET = 0xF000000000000000000000000000000000000000000000000000000000000000;
+    uint256 private constant TOTAL_SUPPLY_STORAGE_OFFSET =
+        0xF000000000000000000000000000000000000000000000000000000000000000;
     uint256 private constant MAX_TOTAL_SUPPLY = 0xFFFFFFFF;
 
     /**
@@ -36,15 +46,15 @@ abstract contract ERC1155PSupply is ERC1155P {
     error ExceedsMaximumTotalSupply();
 
     /**
-     * @dev Total amount of tokens in with a given id.
+     * @dev Total amount of tokens with a given id.
      */
-    function totalSupply(uint256 id) public view returns (uint256 _totalSupply) {
+    function totalSupply(
+        uint256 id
+    ) public view virtual returns (uint256 _totalSupply) {
         assembly {
-            let ptr := mload(0x40)
-            mstore(ptr, or(TOTAL_SUPPLY_STORAGE_OFFSET, shr(3, id)))
-            _totalSupply := shr(shl(5, and(id, 0x07)), and(sload(mload(ptr)), shl(shl(5, and(id, 0x07)), 0xFFFFFFFF)))
+            mstore(0x00, or(TOTAL_SUPPLY_STORAGE_OFFSET, shr(2, id)))
+            _totalSupply := shr(shl(6, and(id, 0x03)), and(sload(keccak256(0x00, 0x20)), shl(shl(6, and(id, 0x03)), 0x00000000FFFFFFFF)))
         }
-        return _totalSupply;
     }
 
     /**
@@ -52,11 +62,36 @@ abstract contract ERC1155PSupply is ERC1155P {
      */
     function setTotalSupply(uint256 id, uint256 amount) private {
         assembly {
-            let ptr := mload(0x40)
-            mstore(ptr, or(TOTAL_SUPPLY_STORAGE_OFFSET, shr(3, id)))
-            mstore(add(ptr, 0x20), sload(mload(ptr)))
-            mstore(add(ptr, 0x20), or(and(not(shl(shl(5, and(id, 0x07)), 0xFFFFFFFF)), mload(add(ptr, 0x20))), shl(shl(5, and(id, 0x07)), amount)))
-            sstore(mload(ptr), mload(add(ptr, 0x20)))
+            mstore(0x00, or(TOTAL_SUPPLY_STORAGE_OFFSET, shr(2, id)))
+            mstore(0x00, keccak256(0x00, 0x20))
+            mstore(0x20, sload(mload(0x00)))
+            mstore(0x20, or(and(not(shl(shl(6, and(id, 0x03)), 0x00000000FFFFFFFF)), mload(0x20)), shl(shl(6, and(id, 0x03)), amount)))
+            sstore(mload(0x00), mload(0x20))
+        }
+    }
+
+    /**
+     * @dev Total amount of tokens minted with a given id.
+     */
+    function totalMinted(
+        uint256 id
+    ) public view virtual returns (uint256 _totalMinted) {
+        assembly {
+            mstore(0x00, or(TOTAL_SUPPLY_STORAGE_OFFSET, shr(2, id)))
+            _totalMinted := shr(32, shr(shl(6, and(id, 0x03)), and(sload(keccak256(0x00, 0x20)), shl(shl(6, and(id, 0x03)), 0xFFFFFFFF00000000))))
+        }
+    }
+
+    /**
+     * @dev Sets total minted in custom storage slot location
+     */
+    function setTotalMinted(uint256 id, uint256 amount) private {
+        assembly {
+            mstore(0x00, or(TOTAL_SUPPLY_STORAGE_OFFSET, shr(2, id)))
+            mstore(0x00, keccak256(0x00, 0x20))
+            mstore(0x20, sload(mload(0x00)))
+            mstore(0x20, or(and(not(shl(shl(6, and(id, 0x03)), 0xFFFFFFFF00000000)), mload(0x20)), shl(shl(6, and(id, 0x03)), shl(32, amount))))
+            sstore(mload(0x00), mload(0x20))
         }
     }
 
@@ -80,11 +115,16 @@ abstract contract ERC1155PSupply is ERC1155P {
     ) internal virtual override {
         if (from == address(0)) {
             uint256 supply = this.totalSupply(id);
+            uint256 minted = this.totalMinted(id);
             unchecked {
                 supply += amount;
+                minted += amount;
             }
-            if(supply > MAX_TOTAL_SUPPLY) { ERC1155P._revert(ExceedsMaximumTotalSupply.selector); }
+            if (supply > MAX_TOTAL_SUPPLY || minted > MAX_TOTAL_SUPPLY) {
+                ERC1155P._revert(ExceedsMaximumTotalSupply.selector);
+            }
             setTotalSupply(id, supply);
+            setTotalMinted(id, minted);
         }
 
         if (to == address(0)) {
@@ -108,20 +148,25 @@ abstract contract ERC1155PSupply is ERC1155P {
         bytes memory
     ) internal virtual override {
         if (from == address(0)) {
-            for (uint256 i = 0; i < ids.length;) {
+            for (uint256 i = 0; i < ids.length; ) {
                 uint256 id = ids[i];
                 uint256 supply = this.totalSupply(id);
+                uint256 minted = this.totalMinted(id);
                 unchecked {
                     supply += amounts[i];
+                    minted += amounts[i];
                     ++i;
                 }
-                if(supply > MAX_TOTAL_SUPPLY) { ERC1155P._revert(ExceedsMaximumTotalSupply.selector); }
+                if (supply > MAX_TOTAL_SUPPLY || minted > MAX_TOTAL_SUPPLY) {
+                    ERC1155P._revert(ExceedsMaximumTotalSupply.selector);
+                }
                 setTotalSupply(id, supply);
+                setTotalMinted(id, minted);
             }
         }
 
         if (to == address(0)) {
-            for (uint256 i = 0; i < ids.length;) {
+            for (uint256 i = 0; i < ids.length; ) {
                 uint256 id = ids[i];
                 uint256 supply = this.totalSupply(id);
                 unchecked {
@@ -131,5 +176,11 @@ abstract contract ERC1155PSupply is ERC1155P {
                 setTotalSupply(id, supply);
             }
         }
+    }
+
+    function supportsInterface(
+        bytes4 interfaceId
+    ) public view virtual override returns (bool) {
+        return super.supportsInterface(interfaceId);
     }
 }
