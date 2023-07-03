@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-// ERC721P Contracts v1.1
+// ERC1155P Contracts v1.1
 // Creator: 0xjustadev/0xth0mas
 
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 import "./IERC1155P.sol";
 
@@ -42,7 +42,7 @@ interface ERC1155P__IERC1155MetadataURI {
 }
 
  /**
- * @title ERC721P
+ * @title ERC1155P
  *
  * @dev Implementation of the basic standard multi-token.
  * See https://eips.ethereum.org/EIPS/eip-1155 including the Metadata extension.
@@ -176,6 +176,7 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      *
      */
     function getBalance(address account, uint256 id) private view returns (uint256 _balance) {
+        /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, or(BALANCE_STORAGE_OFFSET, or(shr(4, shl(96, account)), shr(3, id))))
             _balance := shr(shl(5, and(id, 0x07)), and(sload(keccak256(0x00, 0x20)), shl(shl(5, and(id, 0x07)), 0x0000FFFF)))
@@ -187,12 +188,11 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      *
      */
     function setBalance(address account, uint256 id, uint256 amount) private {
+        /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, or(BALANCE_STORAGE_OFFSET, or(shr(4, shl(96, account)), shr(3, id))))
             mstore(0x00, keccak256(0x00, 0x20))
-            mstore(0x20, sload(mload(0x00)))
-            mstore(0x20, or(and(not(shl(shl(5, and(id, 0x07)), 0x0000FFFF)), mload(0x20)), shl(shl(5, and(id, 0x07)), amount)))
-            sstore(mload(0x00), mload(0x20))
+            sstore(mload(0x00), or(and(not(shl(shl(5, and(id, 0x07)), 0x0000FFFF)), sload(mload(0x00))), shl(shl(5, and(id, 0x07)), amount)))
         }
     }
 
@@ -201,6 +201,7 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      *
      */
     function getMinted(address account, uint256 id) private view returns (uint256 _minted) {
+        /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, or(BALANCE_STORAGE_OFFSET, or(shr(4, shl(96, account)), shr(3, id))))
             _minted := shr(16, shr(shl(5, and(id, 0x07)), and(sload(keccak256(0x00, 0x20)), shl(shl(5, and(id, 0x07)), 0xFFFF0000))))
@@ -212,12 +213,11 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      *
      */
     function setMinted(address account, uint256 id, uint256 amount) private {
+        /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, or(BALANCE_STORAGE_OFFSET, or(shr(4, shl(96, account)), shr(3, id))))
             mstore(0x00, keccak256(0x00, 0x20))
-            mstore(0x20, sload(mload(0x00)))
-            mstore(0x20, or(and(not(shl(shl(5, and(id, 0x07)), 0xFFFF0000)), mload(0x20)), shl(shl(5, and(id, 0x07)), shl(16, amount))))
-            sstore(mload(0x00), mload(0x20))
+            sstore(mload(0x00), or(and(not(shl(shl(5, and(id, 0x07)), 0xFFFF0000)), sload(mload(0x00))), shl(shl(5, and(id, 0x07)), shl(16, amount))))
         }
     }
 
@@ -250,11 +250,11 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      * @dev See {IERC1155-isApprovedForAll}.
      */
     function isApprovedForAll(address account, address operator) public view virtual override returns (bool _approved) {
+        /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, shr(96, shl(96, account)))
             mstore(0x20, or(APPROVAL_STORAGE_OFFSET, shr(96, shl(96, operator))))
             mstore(0x00, keccak256(0x00, 0x40))
-            mstore(0x00, keccak256(0x00, 0x20))
             _approved := sload(mload(0x00))
         }
         return _approved; 
@@ -315,9 +315,10 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
 
         _beforeTokenTransfer(operator, from, to, id, amount, data);
 
+        uint256 fromBalance = getBalance(from, id);
+        if(amount > fromBalance) { _revert(TransferExceedsBalance.selector); }
+
         if(from != to) {
-            uint256 fromBalance = getBalance(from, id);
-            if(amount > fromBalance) { _revert(TransferExceedsBalance.selector); }
             uint256 toBalance = getBalance(to, id);
             unchecked {
                 fromBalance -= amount;
@@ -328,6 +329,7 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             setBalance(to, id, toBalance);   
         }
 
+        /// @solidity memory-safe-assembly
         assembly {
             // Emit the `TransferSingle` event.
             let memOffset := mload(0x40)
@@ -378,14 +380,15 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
 
         _beforeBatchTokenTransfer(operator, from, to, ids, amounts, data);
 
-        if(from != to) {
-            for (uint256 i = 0; i < ids.length;) {
-                uint256 id = ids[i];
-                uint256 amount = amounts[i];
-                if(id > MAX_TOKEN_ID) { _revert(ExceedsMaximumTokenId.selector); }
+        for (uint256 i = 0; i < ids.length;) {
+            uint256 id = ids[i];
+            uint256 amount = amounts[i];
+            if(id > MAX_TOKEN_ID) { _revert(ExceedsMaximumTokenId.selector); }
 
-                uint256 fromBalance = getBalance(from, id);
-                if(amount > fromBalance) { _revert(TransferExceedsBalance.selector); }
+            uint256 fromBalance = getBalance(from, id);
+            if(amount > fromBalance) { _revert(TransferExceedsBalance.selector); }
+
+            if(from != to) {
                 uint256 toBalance = getBalance(to, id);
                 unchecked {
                     fromBalance -= amount;
@@ -394,12 +397,14 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
                 if(toBalance > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
                 setBalance(from, id, fromBalance);
                 setBalance(to, id, toBalance);
-                unchecked {
-                    ++i;
-                }
+            }
+
+            unchecked {
+                ++i;
             }
         }
 
+        /// @solidity memory-safe-assembly
         assembly {
             let memOffset := mload(0x40)
             mstore(memOffset, 0x40)
@@ -447,16 +452,25 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
 
         _beforeTokenTransfer(operator, address(0), to, id, amount, data);
 
-        uint256 toBalance = getBalance(to, id);
-        uint256 toMinted = getMinted(to, id);
+        uint256 toBalanceBefore = getBalance(to, id);
+        uint256 toBalanceAfter;
         unchecked {
-            toBalance += amount;
-            toMinted += amount;
+            toBalanceAfter = toBalanceBefore + amount;
         }
-        if(toBalance > MAX_ACCOUNT_TOKEN_BALANCE || toMinted > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
-        setBalance(to, id, toBalance);
-        setMinted(to, id, toMinted);
+        if(toBalanceAfter > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
+        if(toBalanceAfter < toBalanceBefore) { _revert(ExceedsMaximumBalance.selector); } // catches overflow
+        setBalance(to, id, toBalanceAfter);
 
+        uint256 toMintedBefore = getMinted(to, id);
+        uint256 toMintedAfter;
+        unchecked {
+            toMintedAfter = toMintedBefore + amount;
+        }
+        if(toMintedAfter > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
+        if(toMintedAfter < toMintedBefore) { _revert(ExceedsMaximumBalance.selector); } // catches overflow
+        setMinted(to, id, toMintedAfter);
+
+        /// @solidity memory-safe-assembly
         assembly {
             // Emit the `TransferSingle` event.
             let memOffset := mload(0x40)
@@ -512,20 +526,30 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             if(id > MAX_TOKEN_ID) { _revert(ExceedsMaximumTokenId.selector); }
             if(amount == 0) { _revert(MintZeroQuantity.selector); }
 
-            uint256 toBalance = getBalance(to, id);
-            uint256 toMinted = getMinted(to, id);
+            uint256 toBalanceBefore = getBalance(to, id);
+            uint256 toBalanceAfter;
             unchecked {
-                toBalance += amount;
-                toMinted += amount;
+                toBalanceAfter = toBalanceBefore + amount;
             }
-            if(toBalance > MAX_ACCOUNT_TOKEN_BALANCE || toMinted > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
-            setBalance(to, id, toBalance);
-            setMinted(to, id, toMinted);
+            if(toBalanceAfter > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
+            if(toBalanceAfter < toBalanceBefore) { _revert(ExceedsMaximumBalance.selector); } // catches overflow
+            setBalance(to, id, toBalanceAfter);
+
+            uint256 toMintedBefore = getMinted(to, id);
+            uint256 toMintedAfter;
+            unchecked {
+                toMintedAfter = toMintedBefore + amount;
+            }
+            if(toMintedAfter > MAX_ACCOUNT_TOKEN_BALANCE) { _revert(ExceedsMaximumBalance.selector); }
+            if(toMintedAfter < toMintedBefore) { _revert(ExceedsMaximumBalance.selector); } // catches overflow
+            setMinted(to, id, toMintedAfter);
+
             unchecked {
                 ++i;
             }
         }
 
+        /// @solidity memory-safe-assembly
         assembly {
             let memOffset := mload(0x40)
             mstore(memOffset, 0x40)
@@ -577,6 +601,7 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
         }
         setBalance(from, id, fromBalance);
 
+        /// @solidity memory-safe-assembly
         assembly {
             // Emit the `TransferSingle` event.
             let memOffset := mload(0x40)
@@ -628,6 +653,7 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             }
         }
 
+        /// @solidity memory-safe-assembly
         assembly {
             let memOffset := mload(0x40)
             mstore(memOffset, 0x40)
@@ -657,11 +683,11 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      * Emits an {ApprovalForAll} event.
      */
     function setApprovalForAll(address operator, bool approved) public virtual override {
+        /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, caller())
             mstore(0x20, or(APPROVAL_STORAGE_OFFSET, shr(96, shl(96, operator))))
             mstore(0x00, keccak256(0x00, 0x40))
-            mstore(0x00, keccak256(0x00, 0x20))
             mstore(0x20, approved)
             sstore(mload(0x00), mload(0x20))
             log3(
@@ -806,6 +832,7 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             if (reason.length == 0) {
                 _revert(TransferToNonERC1155ReceiverImplementer.selector);
             }
+            /// @solidity memory-safe-assembly
             assembly {
                 revert(add(32, reason), mload(reason))
             }
@@ -838,6 +865,7 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             if (reason.length == 0) {
                 _revert(TransferToNonERC1155ReceiverImplementer.selector);
             }
+            /// @solidity memory-safe-assembly
             assembly {
                 revert(add(32, reason), mload(reason))
             }
@@ -857,6 +885,7 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      * @dev Converts a uint256 to its ASCII string decimal representation.
      */
     function _toString(uint256 value) internal pure virtual returns (string memory str) {
+        /// @solidity memory-safe-assembly
         assembly {
             // The maximum value of a uint256 contains 78 digits (1 byte per digit), but
             // we allocate 0xa0 bytes to keep the free memory pointer 32-byte word aligned.
@@ -899,6 +928,7 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
      * @dev For more efficient reverts.
      */
     function _revert(bytes4 errorSelector) internal pure {
+        /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, errorSelector)
             revert(0x00, 0x04)

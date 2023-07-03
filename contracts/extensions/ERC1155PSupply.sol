@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 import "../ERC1155P.sol";
 
@@ -22,7 +22,7 @@ abstract contract ERC1155PSupply is ERC1155P {
      *      32 bits are used to store the mint count for a token
      * 
      *      The standard ERC1155P implementation allows a maximum token id
-     *      of 0x0FFFFFFFFFFFFFFFFFFFFFFFF which requires a max bucket id of
+     *      of 0x07FFFFFFFFFFFFFFFFFFFFFFF which requires a max bucket id of
      *      0x1FFFFFFFFFFFFFFFFFFFFFFF. Storage slots for buckets start at
      *      0xF000000000000000000000000000000000000000000000000000000000000000
      *      and continue through
@@ -33,8 +33,8 @@ abstract contract ERC1155PSupply is ERC1155P {
      *      and continue through
      *      0xEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
      * 
-     *      All custom pointers get hashed to avoid potential conflicts or 
-     *      incorrect returns on view functions.
+     *      All custom pointers get hashed to avoid potential conflicts with
+     *      standard mappings or incorrect returns on view functions.
      */
     uint256 private constant TOTAL_SUPPLY_STORAGE_OFFSET =
         0xF000000000000000000000000000000000000000000000000000000000000000;
@@ -51,6 +51,7 @@ abstract contract ERC1155PSupply is ERC1155P {
     function totalSupply(
         uint256 id
     ) public view virtual returns (uint256 _totalSupply) {
+        /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, or(TOTAL_SUPPLY_STORAGE_OFFSET, shr(2, id)))
             _totalSupply := shr(shl(6, and(id, 0x03)), and(sload(keccak256(0x00, 0x20)), shl(shl(6, and(id, 0x03)), 0x00000000FFFFFFFF)))
@@ -61,12 +62,11 @@ abstract contract ERC1155PSupply is ERC1155P {
      * @dev Sets total supply in custom storage slot location
      */
     function setTotalSupply(uint256 id, uint256 amount) private {
+        /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, or(TOTAL_SUPPLY_STORAGE_OFFSET, shr(2, id)))
             mstore(0x00, keccak256(0x00, 0x20))
-            mstore(0x20, sload(mload(0x00)))
-            mstore(0x20, or(and(not(shl(shl(6, and(id, 0x03)), 0x00000000FFFFFFFF)), mload(0x20)), shl(shl(6, and(id, 0x03)), amount)))
-            sstore(mload(0x00), mload(0x20))
+            sstore(mload(0x00), or(and(not(shl(shl(6, and(id, 0x03)), 0x00000000FFFFFFFF)), sload(mload(0x00))), shl(shl(6, and(id, 0x03)), amount)))
         }
     }
 
@@ -76,6 +76,7 @@ abstract contract ERC1155PSupply is ERC1155P {
     function totalMinted(
         uint256 id
     ) public view virtual returns (uint256 _totalMinted) {
+        /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, or(TOTAL_SUPPLY_STORAGE_OFFSET, shr(2, id)))
             _totalMinted := shr(32, shr(shl(6, and(id, 0x03)), and(sload(keccak256(0x00, 0x20)), shl(shl(6, and(id, 0x03)), 0xFFFFFFFF00000000))))
@@ -86,12 +87,11 @@ abstract contract ERC1155PSupply is ERC1155P {
      * @dev Sets total minted in custom storage slot location
      */
     function setTotalMinted(uint256 id, uint256 amount) private {
+        /// @solidity memory-safe-assembly
         assembly {
             mstore(0x00, or(TOTAL_SUPPLY_STORAGE_OFFSET, shr(2, id)))
             mstore(0x00, keccak256(0x00, 0x20))
-            mstore(0x20, sload(mload(0x00)))
-            mstore(0x20, or(and(not(shl(shl(6, and(id, 0x03)), 0xFFFFFFFF00000000)), mload(0x20)), shl(shl(6, and(id, 0x03)), shl(32, amount))))
-            sstore(mload(0x00), mload(0x20))
+            sstore(mload(0x00), or(and(not(shl(shl(6, and(id, 0x03)), 0xFFFFFFFF00000000)), sload(mload(0x00))), shl(shl(6, and(id, 0x03)), shl(32, amount))))
         }
     }
 

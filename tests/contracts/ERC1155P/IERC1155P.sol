@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
-// ERC721P Contracts v1.0.0
+// ERC721P Contracts v1.1
 
-pragma solidity >=0.8.17;
+pragma solidity ^0.8.20;
 
 /**
  * @dev Required interface of an ERC1155 compliant contract, as defined in the
@@ -10,7 +10,6 @@ pragma solidity >=0.8.17;
  * _Available since v3.1._
  */
 interface IERC1155P {
-
     /**
      * Cannot query the balance for the zero address.
      */
@@ -71,7 +70,7 @@ interface IERC1155P {
      * Exceeds max token ID
      */
     error ExceedsMaximumTokenId();
-    
+
     // =============================================================
     //                            IERC165
     // =============================================================
@@ -89,7 +88,13 @@ interface IERC1155P {
     /**
      * @dev Emitted when `value` tokens of token type `id` are transferred from `from` to `to` by `operator`.
      */
-    event TransferSingle(address indexed operator, address indexed from, address indexed to, uint256 id, uint256 value);
+    event TransferSingle(
+        address indexed operator,
+        address indexed from,
+        address indexed to,
+        uint256 id,
+        uint256 value
+    );
 
     /**
      * @dev Equivalent to multiple {TransferSingle} events, where `operator`, `from` and `to` are the same for all
@@ -107,7 +112,11 @@ interface IERC1155P {
      * @dev Emitted when `account` grants or revokes permission to `operator` to transfer their tokens, according to
      * `approved`.
      */
-    event ApprovalForAll(address indexed account, address indexed operator, bool approved);
+    event ApprovalForAll(
+        address indexed account,
+        address indexed operator,
+        bool approved
+    );
 
     /**
      * @dev Emitted when the URI for token type `id` changes to `value`, if it is a non-programmatic URI.
@@ -125,7 +134,10 @@ interface IERC1155P {
      *
      * - `account` cannot be the zero address.
      */
-    function balanceOf(address account, uint256 id) external view returns (uint256);
+    function balanceOf(
+        address account,
+        uint256 id
+    ) external view returns (uint256);
 
     /**
      * @dev xref:ROOT:erc1155.adoc#batch-operations[Batched] version of {balanceOf}.
@@ -155,7 +167,10 @@ interface IERC1155P {
      *
      * See {setApprovalForAll}.
      */
-    function isApprovedForAll(address account, address operator) external view returns (bool);
+    function isApprovedForAll(
+        address account,
+        address operator
+    ) external view returns (bool);
 
     /**
      * @dev Transfers `amount` tokens of token type `id` from `from` to `to`.
@@ -170,7 +185,13 @@ interface IERC1155P {
      * - If `to` refers to a smart contract, it must implement {IERC1155Receiver-onERC1155Received} and return the
      * acceptance magic value.
      */
-    function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes calldata data) external;
+    function safeTransferFrom(
+        address from,
+        address to,
+        uint256 id,
+        uint256 amount,
+        bytes calldata data
+    ) external;
 
     /**
      * @dev xref:ROOT:erc1155.adoc#batch-operations[Batched] version of {safeTransferFrom}.
