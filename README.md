@@ -4,7 +4,7 @@ by [0xth0mas](http://twitter.com/justadev "0xth0mas")
 ## About The Project
 The goal of ERC1155P is to provide a fully compliant implementation of the EIP-1155 standard with significant gas savings for collectors minting, buying and transferring multiple tokens in a collection and open up new possibilities for creators. 
 
-ERC1155P accomplishes this by packing token balance data for 16 tokens into a single storage slot - giving each token 16 bits for its individual token balance - and various other optimizations including custom storage pointer locations and use of assembly logic to produce more gas efficient operations.
+ERC1155P accomplishes this by packing token balance and mint data for 8 tokens into a single storage slot - giving each token 16 bits for its individual token balance and 16 bits for the number minted - and various other optimizations including custom storage pointer locations and use of assembly logic to produce more gas efficient operations.
 
 ERC1155P includes an extension - ERC1155PSupply - that applies similar balance packing and storage optimizations for projects that have use for the totalSupply function.
 
@@ -37,13 +37,11 @@ ERC1155P was tested using 35,000 event logs from an Ethereum ERC1155 collection 
 https://github.com/0xth0mas/ERC1155P/tree/main/tests
 
 ## Known Limitations
-**Maximum Token ID:** The custom storage pointer locations for account/token balances use a combination of the wallet address and token bucket number (tokens 0-15 are in bucket 0, 16-31 are in bucket 1, etc). Wallet address consumes 160 bits of the 256 bit storage pointer leaving 96 bits for token buckets. With 16 tokens in each bucket the maximum token id is 2^100-1.
+**Maximum Token ID:** The custom storage pointer locations for account/token balances use a combination of an offset number, the wallet address and token bucket number (tokens 0-7 are in bucket 0, 8-15 are in bucket 1, etc). The offset uses 4 bits and wallet address uses 160 bits of the 256 bit storage pointer leaving 92 bits for token buckets. With 8 tokens in each bucket the maximum token id is 2^95-1.
 
 **Maximum Account/Token Balance:** Each account/token balance is limited to 16 bits of data which restricts maximum token balance for a single wallet/token combination to 65,535.
 
-**Maximum Total Supply:** ERC1155PSupply utilizes storage packing for the totalSupply of each token in a similar way to the account/token balances except it packs 8 tokens into one storage slot instead of 16 tokens. This allows for a maximum totalSupply of a single token to be 2^32-1, or approximately 4.3B.
-
-**Potential Storage Collision:** ERC1155PSupply uses custom storage pointers starting with 0xF0000... combined with a token totalSupply bucket id. With each bucket holding 8 token totalSupply balances and the maximum number of total token ids being 2^100 the number of buckets required is 2^97 creating a 1 bit overlap with potential account/token balances. If a user had either wallet address 0xF000000000000000000000000000000000000000 or 0xF000000000000000000000000000000000000001 their token balances would collide with totalSupply balances. With wallet addresses being 160 bits there is a 1 in 2^159 potential for collision, just half the odds of finding any other specific Ethereum address private key.
+**Maximum Total Supply:** ERC1155PSupply utilizes storage packing for the totalSupply of each token in a similar way to the account/token balances except it packs 4 tokens into one storage slot instead of 8 tokens. This allows for a maximum totalSupply of a single token to be 2^32-1, or approximately 4.3B.
 
 
 ## License
