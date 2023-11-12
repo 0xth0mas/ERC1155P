@@ -99,7 +99,7 @@ abstract contract ERC1155PSupply is ERC1155P {
      * @dev Indicates whether any token exist with a given id, or not.
      */
     function exists(uint256 id) public view virtual returns (bool) {
-        return this.totalSupply(id) > 0;
+        return totalSupply(id) > 0;
     }
 
     /**
@@ -114,8 +114,8 @@ abstract contract ERC1155PSupply is ERC1155P {
         bytes memory
     ) internal virtual override {
         if (from == address(0)) {
-            uint256 supply = this.totalSupply(id);
-            uint256 minted = this.totalMinted(id);
+            uint256 supply = totalSupply(id);
+            uint256 minted = totalMinted(id);
             unchecked {
                 supply += amount;
                 minted += amount;
@@ -128,7 +128,7 @@ abstract contract ERC1155PSupply is ERC1155P {
         }
 
         if (to == address(0)) {
-            uint256 supply = this.totalSupply(id);
+            uint256 supply = totalSupply(id);
             unchecked {
                 supply -= amount;
             }
@@ -150,8 +150,8 @@ abstract contract ERC1155PSupply is ERC1155P {
         if (from == address(0)) {
             for (uint256 i = 0; i < ids.length; ) {
                 uint256 id = ids[i];
-                uint256 supply = this.totalSupply(id);
-                uint256 minted = this.totalMinted(id);
+                uint256 supply = totalSupply(id);
+                uint256 minted = totalMinted(id);
                 unchecked {
                     supply += amounts[i];
                     minted += amounts[i];
@@ -168,7 +168,7 @@ abstract contract ERC1155PSupply is ERC1155P {
         if (to == address(0)) {
             for (uint256 i = 0; i < ids.length; ) {
                 uint256 id = ids[i];
-                uint256 supply = this.totalSupply(id);
+                uint256 supply = totalSupply(id);
                 unchecked {
                     supply -= amounts[i];
                     ++i;
