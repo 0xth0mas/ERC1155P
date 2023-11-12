@@ -87,21 +87,11 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
     bytes32 private constant _APPROVAL_FOR_ALL_EVENT_SIGNATURE =
         0x17307eab39ab6107e8899845ad3d59bd9653f200f220920489ca2b5937696c31;
 
-    string public name; //collection name
-    string public symbol; //collection symbol
+    /// @dev Returns the name of the token.
+    function name() public view virtual returns(string memory);
 
-    // Optional mapping for token URIs
-    mapping(uint256 => string) private _tokenURIs;
-
-    /**
-     * @dev constructor initialization of name and symbol parameters
-     * @param _name the name to display for the collection
-     * @param _symbol the symbol for the token collection
-     */
-    constructor(string memory _name, string memory _symbol) {
-        name = _name;
-        symbol = _symbol;
-    }
+    /// @dev Returns the symbol of the token.
+    function symbol() public view virtual returns(string memory);
 
     /**
      * @dev Returns true if this contract implements the interface defined by
@@ -121,35 +111,15 @@ abstract contract ERC1155P is IERC1155P, ERC1155P__IERC1155MetadataURI {
             interfaceId == 0xd9b67a26 || // ERC165 interface ID for ERC1155.
             interfaceId == 0x0e89341c; // ERC165 interface ID for ERC1155MetadataURI.
     }
-    
-    /**
-     * @dev Returns the Uniform Resource Identifier (URI) for `tokenId` token.
-     */
-    function uri(uint256 id) public view virtual override returns (string memory) {
-        string memory tokenURI = _tokenURIs[id];
-        string memory baseURI = _baseURI();
 
-        return bytes(tokenURI).length > 0 ? 
-            tokenURI : 
-            bytes(baseURI).length != 0 ? string(abi.encodePacked(baseURI, _toString(id))) : '';
-    }
-
-    /**
-     * @dev Base URI for computing {tokenURI}. If set, the resulting URI for each
-     * token will be the concatenation of the `baseURI` and the `tokenId`. Empty
-     * by default, it can be overridden in child contracts.
-     */
-    function _baseURI() internal view virtual returns (string memory) {
-        return '';
-    }
-
-    /**
-     * @dev Sets `tokenURI` as the tokenURI of `tokenId`.
-     */
-    function _setURI(uint256 tokenId, string calldata tokenURI) internal virtual {
-        _tokenURIs[tokenId] = tokenURI;
-        emit URI(uri(tokenId), tokenId);
-    }
+    /// @dev Returns the URI for token `id`.
+    ///
+    /// You can either return the same templated URI for all token IDs,
+    /// (e.g. "https://example.com/api/{id}.json"),
+    /// or return a unique URI for each `id`.
+    ///
+    /// See: https://eips.ethereum.org/EIPS/eip-1155#metadata
+    function uri(uint256 id) public view virtual returns (string memory);
 
     /**
      * @dev See {IERC1155-balanceOf}.
